@@ -1,0 +1,7 @@
+PyQt5==5.15.10
+VisPy==0.14.1
+freetype-py==2.4.0
+hsluv==5.0.4
+scipy==1.11.4
+numpy==1.24.3
+matplotlib
