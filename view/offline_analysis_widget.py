@@ -1,26 +1,31 @@
+import logging
+
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QLabel, QPushButton
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 import numpy as np
 from scipy import signal
 
+from config import SAMPLING_FREQUENCY, LOW_CUTOFF_FREQUENCY, HIGH_CUTOFF_FREQUENCY, FILTER_ORDER, RMS_WINDOW
+
 
 class OfflineAnalysisWidget(QWidget):
-    def __init__(self, viewmodel):
+    def __init__(self, get_data_callback):
         super().__init__()
-        self.viewmodel = viewmodel
         self.setWindowTitle("Offline Signal Analysis")
         self.setGeometry(200, 200, 1200, 800)
         
         # Filter parameters (same as in channel_plot_widget)
-        self.fs = 1000  # Sampling frequency (Hz)
-        self.lowcut = 1.0  # Low cutoff frequency
-        self.highcut = 100.0  # High cutoff frequency
-        self.filter_order = 4
-        self.rms_window = 50  # RMS window size
+        self.fs = SAMPLING_FREQUENCY  # Sampling frequency (Hz)
+        self.lowcut = LOW_CUTOFF_FREQUENCY  # Low cutoff frequency
+        self.highcut = HIGH_CUTOFF_FREQUENCY  # High cutoff frequency
+        self.filter_order = FILTER_ORDER
+        self.rms_window = RMS_WINDOW# RMS window size
         
         self.init_ui()
-        
+
+        self.get_data_callback = get_data_callback
+
     def init_ui(self):
         layout = QVBoxLayout()
         
@@ -31,26 +36,26 @@ class OfflineAnalysisWidget(QWidget):
         control_layout.addWidget(QLabel("Channel:"))
         self.channel_selector = QComboBox()
         self.channel_selector.addItems([f"Channel {i}" for i in range(32)])
-        self.channel_selector.currentIndexChanged.connect(self.update_plot)
+        self.channel_selector.currentIndexChanged.connect(self.plot)
         control_layout.addWidget(self.channel_selector)
         
         # Signal type selector
         control_layout.addWidget(QLabel("Signal Type:"))
         self.signal_type_selector = QComboBox()
         self.signal_type_selector.addItems(["Unfiltered", "Filtered", "RMS"])
-        self.signal_type_selector.currentIndexChanged.connect(self.update_plot)
+        self.signal_type_selector.currentIndexChanged.connect(self.plot)
         control_layout.addWidget(self.signal_type_selector)
         
         # View mode selector
         control_layout.addWidget(QLabel("View Mode:"))
         self.view_mode_selector = QComboBox()
         self.view_mode_selector.addItems(["Complete Signal", "Signal Statistics"])
-        self.view_mode_selector.currentIndexChanged.connect(self.update_plot)
+        self.view_mode_selector.currentIndexChanged.connect(self.plot)
         control_layout.addWidget(self.view_mode_selector)
         
         # Refresh button
         self.refresh_button = QPushButton("Refresh")
-        self.refresh_button.clicked.connect(self.update_plot)
+        self.refresh_button.clicked.connect(self.plot)
         control_layout.addWidget(self.refresh_button)
         
         layout.addLayout(control_layout)
@@ -65,56 +70,16 @@ class OfflineAnalysisWidget(QWidget):
         layout.addWidget(self.stats_label)
         
         self.setLayout(layout)
-        
-        # Initial plot
-        self.update_plot()
-    
-    def _apply_bandpass_filter(self, data):
-        """Apply bandpass filter to the data"""
-        if len(data) < 2 * self.filter_order:
-            return data  # Not enough data for filtering
-        
-        try:
-            nyquist = 0.5 * self.fs
-            low = self.lowcut / nyquist
-            high = self.highcut / nyquist
-            b, a = signal.butter(self.filter_order, [low, high], btype='band')
-            return signal.filtfilt(b, a, data)
-        except:
-            return data  # Return original data if filtering fails
-    
-    def _calculate_rms(self, data):
-        """Calculate RMS values using a sliding window"""
-        if len(data) < self.rms_window:
-            return np.sqrt(np.mean(data**2)) * np.ones_like(data)
-        
-        rms_values = np.zeros_like(data)
-        for i in range(len(data)):
-            start_idx = max(0, i - self.rms_window // 2)
-            end_idx = min(len(data), i + self.rms_window // 2 + 1)
-            rms_values[i] = np.sqrt(np.mean(data[start_idx:end_idx]**2))
-        return rms_values
-    
-    def _process_signal(self, data, signal_type):
-        """Process signal based on type"""
-        if signal_type == 0:  # Unfiltered
-            return data
-        elif signal_type == 1:  # Filtered
-            return self._apply_bandpass_filter(data)
-        elif signal_type == 2:  # RMS
-            return self._calculate_rms(data)
-        return data
-        
-    def update_plot(self):
+
+    def plot(self):
         channel_index = self.channel_selector.currentIndex()
         signal_type = self.signal_type_selector.currentIndex()
         view_mode = self.view_mode_selector.currentIndex()
         
-        # Get channel data
-        raw_channel_data = self.viewmodel.get_channel_data(channel_index)
-        
+        raw_data = self.get_data_callback(channel_index)
+
         # Process signal based on selected type
-        channel_data = self._process_signal(raw_channel_data, signal_type)
+        channel_data = self._process_signal(raw_data, signal_type)
         
         # Get signal type name for display
         signal_type_names = ["Unfiltered", "Filtered", "RMS"]
@@ -209,3 +174,37 @@ class OfflineAnalysisWidget(QWidget):
             self.stats_label.setText(stats_text)
         else:
             self.stats_label.setText("No data available for statistics")
+
+    def _apply_bandpass_filter(self, data):
+        if len(data) < 2 * self.filter_order:
+            return data  # Not enough data for filtering
+
+        try:
+            nyquist = 0.5 * self.fs
+            low = self.lowcut / nyquist
+            high = self.highcut / nyquist
+            b, a = signal.butter(self.filter_order, [low, high], btype='band')
+            return signal.filtfilt(b, a, data)
+        except Exception as e:
+            logging.error(e)
+            return data
+
+    def _calculate_rms(self, data):
+        if len(data) < self.rms_window:
+            return np.sqrt(np.mean(data ** 2)) * np.ones_like(data)
+
+        rms_values = np.zeros_like(data)
+        for i in range(len(data)):
+            start_idx = max(0, i - self.rms_window // 2)
+            end_idx = min(len(data), i + self.rms_window // 2 + 1)
+            rms_values[i] = np.sqrt(np.mean(data[start_idx:end_idx] ** 2))
+        return rms_values
+
+    def _process_signal(self, data, signal_type):
+        if signal_type == 0:  # Unfiltered
+            return data
+        elif signal_type == 1:  # Filtered
+            return self._apply_bandpass_filter(data)
+        elif signal_type == 2:  # RMS
+            return self._calculate_rms(data)
+        return data

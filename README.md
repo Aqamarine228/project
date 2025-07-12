@@ -6,7 +6,7 @@ A real-time signal visualization application built with PyQt5 and VisPy, designe
 
 ### Real-time Visualization
 - Multi-channel signal plotting with smooth updates
-- Auto-scaling Y-axis for optimal viewing
+- Auto-scaling for optimal viewing
 - Channel switching capabilities
 - Performance-optimized rendering with VisPy
 
@@ -48,26 +48,63 @@ The application follows the MVVM (Model-View-ViewModel) pattern:
 
 ## Requirements
 
-- Python 3.7+
-- PyQt5
-- VisPy
-- NumPy
-- Matplotlib (for offline analysis)
+- Python 3.12+
+
+## Quick Start
+
+1. Clone the repository and install dependencies:
+```bash
+git clone <repository-url>
+cd project
+pip install -r requirements.txt
+```
+
+2. Start the test server (in one terminal):
+```bash
+python tcp_test_server.py
+```
+
+3. Run the application (in another terminal):
+```bash
+python main.py
+```
+
+4. In the application:
+   - Click "Connect" to start receiving data
+   - Use channel selector to switch between channels
+   - Click "Offline Analysis" to explore data analysis features
 
 ## Installation
 
-1. Clone the repository:
+### Prerequisites
+- Python 3.12 or higher
+- pip package manager
+
+### Step-by-step Installation
+
+1. **Clone the repository:**
 ```bash
 git clone <repository-url>
 cd project
 ```
 
-2. Install dependencies:
+2. **Create a virtual environment (recommended):**
+```bash
+python -m venv venv
+
+# On Windows:
+venv\Scripts\activate
+
+# On macOS/Linux:
+source venv/bin/activate
+```
+
+3. **Install dependencies:**
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Run the application:
+4. **Verify installation:**
 ```bash
 python main.py
 ```
@@ -78,25 +115,21 @@ python main.py
 
 1. Launch the application with `python main.py`
 2. Enter the TCP server details (host and port)
-3. Click "Connect" to establish connection
+3. Click "Listen TCP" to wait for connections
 
-### Real-time Monitoring
-
-- Use the channel selector to switch between different data channels
-- The plot automatically updates with incoming data
-- Y-axis scales automatically based on signal amplitude
-
-### Connection Management
-
-- **Connect**: Establish TCP connection and start data reception
-- **Disconnect**: Close connection while preserving received data
+- **Listen TCP**: Start listening for tcp connections
+- **Stop listening TCP**: Stop listening for incoming connections
 - **Status**: Monitor connection state in real-time
 
 ### Offline Analysis
 
-1. Collect data by connecting to a TCP server
+1. Collect data by connecting to a TCP server (or use offline analysis anytime when data is available)
 2. Click "Offline Analysis" to open the analysis window
-3. Select channel and analysis type:
+3. Select channel and signal type:
+   - **Unfiltered**: Raw signal data
+   - **Filtered**: Bandpass filtered signal (1-100 Hz, 4th order Butterworth)
+   - **RMS**: Root Mean Square values (50-sample window)
+4. Choose analysis type:
    - **Complete Signal**: Full signal visualization
    - **Histogram**: Data distribution analysis
    - **Running Average**: Smoothed signal trends
@@ -111,63 +144,38 @@ python main.py
 
 ## TCP Server Setup
 
-The application expects a TCP server that sends binary data in the following format:
+### Using the Included Test Server
 
-```python
-# Example TCP server
-import socket
-import struct
-import time
-import math
+The project includes a test server (`tcp_test_server.py`) for development and testing:
 
-def start_server():
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(('localhost', 12345))
-    server.listen(1)
-    
-    print("Server listening on localhost:12345")
-    
-    while True:
-        client, addr = server.accept()
-        print(f"Client connected: {addr}")
-        
-        try:
-            t = 0
-            while True:
-                # Generate sample data for 4 channels
-                channel1 = math.sin(t) * 100
-                channel2 = math.cos(t) * 50
-                channel3 = math.sin(t * 2) * 75
-                channel4 = math.cos(t * 0.5) * 25
-                
-                # Pack as binary data (4 floats)
-                data = struct.pack('ffff', channel1, channel2, channel3, channel4)
-                client.send(data)
-                
-                t += 0.1
-                time.sleep(0.05)  # 20 Hz update rate
-                
-        except (ConnectionResetError, BrokenPipeError):
-            print("Client disconnected")
-        finally:
-            client.close()
+```bash
+# Run with default settings (localhost:12345, 4 channels, 20 Hz)
+python tcp_test_server.py
 
-if __name__ == "__main__":
-    start_server()
+# Run with custom settings
+python tcp_test_server.py --host localhost --port 5000 --channels 32 --rate 20
 ```
+
+The test server generates various signal types:
+- **Channel 1**: Sine wave
+- **Channel 2**: Cosine wave  
+- **Channel 3**: Square wave
+- **Channel 4**: Sawtooth wave
+- **Additional channels**: Combinations of the above
 
 ## Application Controls
 
 ### Main Window
-- **Host**: TCP server hostname or IP address
-- **Port**: TCP server port number
 - **Channel**: Select active channel for real-time plotting
-- **Connect/Disconnect**: Manage TCP connection
+- **Listen/Stop listening TCP**: Manage TCP connection
 - **Offline Analysis**: Open offline analysis window
 - **Clear Data**: Reset all stored data
+- **STOP**: Stop receiving new data from client without disconnection
+- **RESUME**: Resume receiving data from client
 
 ### Offline Analysis Window
 - **Channel Selector**: Choose channel for analysis
+- **Signal Type**: Select signal processing (Unfiltered, Filtered, RMS)
 - **View Mode**: Select analysis type
 - **Refresh**: Update analysis with latest data
 - **Statistics**: View numerical analysis results
@@ -196,13 +204,6 @@ The application includes comprehensive error handling:
 3. **MainViewModel**: Coordinates between services and views
 4. **ChannelPlotWidget**: Real-time signal visualization
 5. **OfflineAnalysisWidget**: Statistical analysis and visualization
-
-### Adding New Features
-
-1. **New Analysis Types**: Extend `OfflineAnalysisWidget` with additional analysis methods
-2. **Data Formats**: Modify `DataBuffer` to support different data structures
-3. **Visualization**: Add new plot types to `ChannelPlotWidget`
-4. **Communication**: Extend `TCPService` for different protocols
 
 ## Troubleshooting
 
