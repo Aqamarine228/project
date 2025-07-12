@@ -214,15 +214,6 @@ The application includes comprehensive error handling:
 3. **No Data Display**: Check data format matches expected binary structure
 4. **Performance Issues**: Reduce update rate or data history size
 
-### Debug Mode
-
-Enable debug logging by modifying the logging level in `main.py`:
-
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
-
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
