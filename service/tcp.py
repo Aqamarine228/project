@@ -62,8 +62,6 @@ class TCPService:
                     while len(data) < RECEIVE_CHUNK_SIZE:
                         packet = client_socket.recv(RECEIVE_CHUNK_SIZE - len(data))
 
-                        print(len(packet))
-
                         if len(packet) == 0:
                             return
 
